@@ -25,6 +25,7 @@ CREATE TABLE alliances (
     tag VARCHAR(5) NOT NULL,
     alliance_id VARCHAR(50) NOT NULL,
     region VARCHAR(50) NOT NULL,
+    skip_name_check BOOLEAN NOT NULL DEFAULT false,
     first_seen TIMESTAMPTZ NOT NULL,
     last_seen TIMESTAMPTZ NOT NULL,
     PRIMARY KEY (alliance_id, region)
