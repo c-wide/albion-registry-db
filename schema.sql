@@ -2,6 +2,8 @@ CREATE TABLE players (
     name VARCHAR(25) NOT NULL,
     player_id VARCHAR(50) NOT NULL,
     region VARCHAR(50) NOT NULL,
+    avatar VARCHAR(255),
+    avatar_ring VARCHAR(255),
     first_seen TIMESTAMPTZ NOT NULL,
     last_seen TIMESTAMPTZ NOT NULL,
     PRIMARY KEY (player_id, region)
