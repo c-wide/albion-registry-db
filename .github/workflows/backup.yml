@@ -1,0 +1,57 @@
+name: Back up database
+
+on:
+  schedule:
+    - cron: "0 0 * * *"
+  workflow_dispatch:
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+      FLY_APP_NAME: ${{ secrets.FLY_APP_NAME }}
+      DB_USER: ${{ secrets.DB_USER }}
+      DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+      DB_NAME: ${{ secrets.DB_NAME }}
+      S3_BUCKET_NAME: ${{ secrets.S3_BUCKET_NAME }}
+
+    steps:
+      - name: Set up S3cmd cli tool
+        uses: s3-actions/s3cmd@v1.6.1
+        with:
+          provider: aws
+          region: us-east-1
+          access_key: ${{ secrets.S3_ACCESS_KEY }}
+          secret_key: ${{ secrets.S3_SECRET_KEY }}
+
+      - name: Set up Flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Generate backup filename & add to environment variables
+        run: |
+          echo "filename=db-$(date -u +"%Y-%m-%d-%H%M%S").sql" >> $GITHUB_ENV
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+          wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo tee /etc/apt/trusted.gpg.d/pgdg.asc &>/dev/null
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-15
+
+      - name: Proxy database connection
+        run: |
+          flyctl proxy 6543:5432 -a $FLY_APP_NAME &
+          sleep 3
+
+      - name: Create database dump
+        run: |
+          PGPASSWORD=${DB_PASSWORD} pg_dump -h localhost -p 6543 -x -U $DB_USER -F c -b -v  -Z0 -f ${{ env.filename }} ${DB_NAME}
+
+      - name: Compress database dump
+        run: |
+          gzip ${{ env.filename }}
+
+      - name: Upload database dump to S3
+        run: |
+          s3cmd put --acl-private ${{ env.filename }}.gz s3://$S3_BUCKET_NAME/${{ env.filename }}.gz
